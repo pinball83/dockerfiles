@@ -40,9 +40,9 @@ RUN /usr/sbin/cupsd \
 # Patch the default configuration file to only enable encryption if requested
 RUN sed -e '0,/^</s//DefaultEncryption IfRequested\n&/' -i /etc/cups/cupsd.conf
 
-RUN wget https://github.com/hieplpvip/canon_printer/raw/master/canon_lbp_setup.sh \
-    && chmod +x canon_lbp_setup.sh \
-    && ./canon_lbp_setup.sh Install LBP2900
+RUN wget https://raw.githubusercontent.com/pinball83/dockerfiles/master/cupsd/capt/capt_installer.sh \
+    && chmod +x capt_installer.sh \
+    && ./capt_installer.sh
 
 # Default shell
 CMD ["/usr/sbin/cupsd", "-f"]

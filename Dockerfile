@@ -1,48 +1,45 @@
-FROM olbat/debian:testing
-MAINTAINER devel@olbat.net
+FROM alpine:latest
 
-# Install Packages (basic tools, cups, basic drivers, HP drivers)
-RUN apt-get update \
-&& apt-get install -y \
-  sudo \
-  whois \
-  cups \
-  cups-client \
-  cups-bsd \
-  cups-filters \
-  foomatic-db-compressed-ppds \
-  printer-driver-all \
-  openprinting-ppds \
-  hpijs-ppds \
-  hp-ppd \
-  hplip \
-  smbclient \
-  printer-driver-cups-pdf \
-&& apt-get clean \
-&& rm -rf /var/lib/apt/lists/*
+# Install the packages we need. Avahi will be included
+RUN echo "http://nl.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories &&\
+	apk add --update cups \
+	cups-libs \
+	cups-pdf \
+	cups-client \
+	cups-filters \
+	cups-dev \
+	ghostscript \
+	avahi \
+	inotify-tools \
+	python3 \
+	python3-dev \
+	py-pip \
+	build-base \
+	wget \
+	rsync \
+	&& pip --no-cache-dir install --upgrade pip \
+	&& pip install pycups \
+	&& rm -rf /var/cache/apk/*
 
-# Add user and disable sudo password checking
-RUN useradd \
-  --groups=sudo,lp,lpadmin \
-  --create-home \
-  --home-dir=/home/print \
-  --shell=/bin/bash \
-  --password=$(mkpasswd print) \
-  print \
-&& sed -i '/%sudo[[:space:]]/ s/ALL[[:space:]]*$/NOPASSWD:ALL/' /etc/sudoers
+# This will use port 631
+EXPOSE 631
 
-# Configure the service's to be reachable
-RUN /usr/sbin/cupsd \
-  && while [ ! -f /var/run/cups/cupsd.pid ]; do sleep 1; done \
-  && cupsctl --remote-admin --remote-any --share-printers \
-  && kill $(cat /var/run/cups/cupsd.pid)
+# We want a mount for these
+VOLUME /config
+VOLUME /services
 
-# Patch the default configuration file to only enable encryption if requested
-RUN sed -e '0,/^</s//DefaultEncryption IfRequested\n&/' -i /etc/cups/cupsd.conf
+# Add scripts
+ADD root /
+RUN chmod +x /root/*
+RUN chmod +x /capt/*
+CMD ["/root/run_cups.sh"]
+CMD ["/capt/capt_installer.sh"]
 
-RUN wget https://raw.githubusercontent.com/pinball83/dockerfiles/master/capt/capt_installer.sh \
-    && chmod +x capt_installer.sh \
-    && ./capt_installer.sh
-
-# Default shell
-CMD ["/usr/sbin/cupsd", "-f"]
+# Baked-in config file changes
+RUN sed -i 's/Listen localhost:631/Listen 0.0.0.0:631/' /etc/cups/cupsd.conf && \
+	sed -i 's/Browsing Off/Browsing On/' /etc/cups/cupsd.conf && \
+	sed -i 's/<Location \/>/<Location \/>\n  Allow All/' /etc/cups/cupsd.conf && \
+	sed -i 's/<Location \/admin>/<Location \/admin>\n  Allow All\n  Require user @SYSTEM/' /etc/cups/cupsd.conf && \
+	sed -i 's/<Location \/admin\/conf>/<Location \/admin\/conf>\n  Allow All/' /etc/cups/cupsd.conf && \
+	echo "ServerAlias *" >> /etc/cups/cupsd.conf && \
+	echo "DefaultEncryption Never" >> /etc/cups/cupsd.conf

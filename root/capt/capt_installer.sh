@@ -278,7 +278,6 @@ Icon=/usr/share/icons/Humanity/devices/48/printer.svg' > "${XDG_DESKTOP_DIR}/$NA
 			sleep 5
 		fi
 		echo 'Installation completed. Press any key to exit'
-		read -s -n1
 		exit 0
 	else
 		echo 'Driver for $NAMEPRINTER is not installed!'
